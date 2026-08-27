@@ -4,21 +4,38 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from control_msgs.action import FollowJointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
+from moveit_msgs.action import MoveGroup
+from moveit_msgs.msg import Constraints, JointConstraint
 
 class MotionSequenceNode(Node):
     def __init__(self):
         super().__init__('motion_sequence_node')
         self.get_logger().info('Motion Sequence Node Initialized. Starting sequence...')
         
-        # Parameters for dwell time and looping
+        # Declare parameters (with defaults just in case)
         self.declare_parameter('dwell_time', 2.0)
         self.declare_parameter('enable_loop', True)
+        self.declare_parameter('poses.home', [0.0, -1.57, 0.0, -1.57, 0.0, 0.0])
+        self.declare_parameter('poses.pose_1', [0.5, -1.0, 1.2, -0.5, 1.5, 0.0])
+        self.declare_parameter('poses.pose_2', [-0.5, -1.2, 1.0, 0.5, -1.5, 0.0])
+        self.declare_parameter('gripper.open', 0.035)
         
         self.dwell_time = self.get_parameter('dwell_time').value
         self.enable_loop = self.get_parameter('enable_loop').value
         
+        # Load poses dynamically from parameters instead of hardcoding
+        self.poses = {
+            "Home": self.get_parameter('poses.home').value,
+            "Pose 1": self.get_parameter('poses.pose_1').value,
+            "Pose 2": self.get_parameter('poses.pose_2').value
+        }
+        
+        # Load gripper value
+        g_open = self.get_parameter('gripper.open').value
+        self.gripper_open = [g_open, g_open]
+
         # Action clients for controllers
-        self.arm_client = ActionClient(self, FollowJointTrajectory, '/arm_group_controller/follow_joint_trajectory')
+        self.arm_client = ActionClient(self, MoveGroup, '/move_action')
         self.gripper_client = ActionClient(self, FollowJointTrajectory, '/gripper_controller/follow_joint_trajectory')
         
         # Wait for action servers
@@ -27,42 +44,48 @@ class MotionSequenceNode(Node):
         self.gripper_client.wait_for_server()
         self.get_logger().info('Controller action servers connected!')
         
-        # Define named poses in radians
-        # Order: [shoulder_pan, shoulder_lift, elbow, wrist_1, wrist_2, wrist_3]
-        self.poses = {
-         "Home": [0.0, -1.57, 0.0, -1.57, 0.0, 0.0],  # Standing straight up vertical
-         "Pose 1": [0.5, -1.0, 1.2, -0.5, 1.5, 0.0],
-         "Pose 2": [-0.5, -1.2, 1.0, 0.5, -1.5, 0.0]
-        }
-        
-        # Gripper positions: [left_finger, right_finger]
-        self.gripper_open = [0.03, 0.03]
-
         # Start the sequence
         self.execute_sequence()
-
+ 
     def send_arm_goal(self, positions):
-        goal_msg = FollowJointTrajectory.Goal()
-        goal_msg.trajectory.joint_names = [
-            'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 
+        joint_names = [
+            'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
             'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint'
         ]
-        point = JointTrajectoryPoint()
-        point.positions = positions
-        point.time_from_start.sec = 3
-        goal_msg.trajectory.points = [point]
-        
+
+        constraints = Constraints()
+        for name, pos in zip(joint_names, positions):
+            jc = JointConstraint()
+            jc.joint_name = name
+            jc.position = pos
+            jc.tolerance_above = 0.01
+            jc.tolerance_below = 0.01
+            jc.weight = 1.0
+            constraints.joint_constraints.append(jc)
+
+        goal_msg = MoveGroup.Goal()
+        goal_msg.request.group_name = 'arm_group'
+        goal_msg.request.goal_constraints = [constraints]
+        goal_msg.request.allowed_planning_time = 5.0
+        goal_msg.request.num_planning_attempts = 5
+        goal_msg.planning_options.plan_only = False
+
         send_goal_future = self.arm_client.send_goal_async(goal_msg)
         rclpy.spin_until_future_complete(self, send_goal_future)
         goal_handle = send_goal_future.result()
-        
+
         if not goal_handle.accepted:
+            self.get_logger().error('MoveIt goal rejected!')
             return False
-            
+
         result_future = goal_handle.get_result_async()
         rclpy.spin_until_future_complete(self, result_future)
-        return True
+        result = result_future.result().result
 
+        success = (result.error_code.val == 1)
+        if not success:
+            self.get_logger().error(f'MoveIt planning/execution failed, error code: {result.error_code.val}')
+        return success
     def send_gripper_goal(self, positions):
         goal_msg = FollowJointTrajectory.Goal()
         goal_msg.trajectory.joint_names = ['left_finger_joint', 'right_finger_joint']
@@ -115,14 +138,16 @@ class MotionSequenceNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MotionSequenceNode()
+    node = None
     try:
-        rclpy.spin(node)
+        node = MotionSequenceNode()
     except KeyboardInterrupt:
-        node.get_logger().info('Shutting down cleanly via Keyboard Interrupt (Ctrl+C).')
+        pass
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

@@ -3,3 +3,9 @@ install/
 log/
 .DS_Store/
 .vscode/
+build/
+install/
+log/
+.ros/
+__pycache__/
+unused_backup/

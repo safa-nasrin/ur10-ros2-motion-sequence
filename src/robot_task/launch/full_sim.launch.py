@@ -30,7 +30,7 @@ def generate_launch_description():
         package='robot_state_publisher',
         executable='robot_state_publisher',
         output='both',
-        parameters=[moveit_config.robot_description]
+        parameters=[moveit_config.robot_description, {'use_sim_time': True} ]
     )
     
     # 5. Start MoveIt Move Group
@@ -38,7 +38,7 @@ def generate_launch_description():
         package='moveit_ros_move_group',
         executable='move_group',
         output='screen',
-        parameters=[moveit_config.to_dict()]
+        parameters=[moveit_config.to_dict(), {'use_sim_time': True} ]
     )
     
     # 6. Start RViz (Optional but required for visual proof)
@@ -47,8 +47,11 @@ def generate_launch_description():
         executable='rviz2',
         output='screen',
         parameters=[
-            moveit_config.planning_pipelines,
-            moveit_config.robot_description_kinematics,
+             moveit_config.robot_description,
+             moveit_config.robot_description_semantic,
+             moveit_config.planning_pipelines,
+             moveit_config.robot_description_kinematics,
+             {'use_sim_time': True},
         ]
     )
     
@@ -73,11 +76,14 @@ def generate_launch_description():
             Node(
                 package='robot_task',
                 executable='motion_sequence_node',
-                output='screen'
+                output='screen',
+                parameters=[
+                    os.path.join(get_package_share_directory('robot_task'), 'config', 'poses.yaml'),
+                    {'use_sim_time': True}
+                ]
             )
         ]
     )
-
     # Event Handlers to ensure reliable startup order
     return LaunchDescription([
         gazebo,
