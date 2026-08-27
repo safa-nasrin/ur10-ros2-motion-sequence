@@ -1,0 +1,10 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: robot_description
+    relative_path: urdf/ur10_gripper.urdf.xacro
+  srdf:
+    relative_path: config/ur10_with_gripper.srdf
+  package_settings:
+    author_name: Safa Nasrin
+    author_email: safanasrin471@gmail.com
+    generated_timestamp: 1787798378

@@ -1,0 +1,16 @@
+robot_task:
+  ros__parameters:
+    dwell_time: 2.0
+    enable_loop: true
+    planning_group: "arm_group"
+    
+    # Radians for the 6 joints: [shoulder_pan, shoulder_lift, elbow, wrist_1, wrist_2, wrist_3]
+    poses:
+      home: [0.0, -1.57, 0.0, -1.57, 0.0, 0.0]
+      pose_1: [0.5, -1.0, 1.2, -1.57, 1.57, 0.0]
+      pose_2: [-0.5, -1.2, 1.0, -1.0, 0.0, 0.0]
+      
+    # Gripper positions (prismatic joints)
+    gripper:
+      closed: 0.0
+      open: 0.035
