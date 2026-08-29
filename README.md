@@ -2,6 +2,12 @@
 
 This repository contains a complete ROS 2 workspace that simulates a UR10-like 6-DOF robotic arm with a parallel gripper. The system integrates ROS 2 Humble, MoveIt 2 for motion planning, and Gazebo (Ignition) for physics simulation. An automated Python node continuously executes a specific joint-space motion sequence.
 
+
+
+https://github.com/user-attachments/assets/1617b438-61ef-46f2-b7dc-a9fbb7c9b15c
+
+
+
 ## 1. Environment & Prerequisites
 Before cloning and building this repository, your host machine must have the following core stack installed and configured:
 
